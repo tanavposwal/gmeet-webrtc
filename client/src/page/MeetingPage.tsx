@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import socketIO from "socket.io-client";
+import socketIO, { Socket } from "socket.io-client";
 import { Button, Grid, Typography } from "@mui/material";
 import { CentralizedCard } from "../components/CentralizedCard";
 import { Video } from "../components/Video";
@@ -14,16 +14,16 @@ let pc = new RTCPeerConnection({
 });
 
 export function MeetingPage() {
-  const [socket, setSocket] = useState(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [meetingJoined, setMeetingJoined] = useState(false);
-  const [videoStream, setVideoStream] = useState();
-  const [remoteVideoStream, setRemoteVideoStream] = useState();
+  const [videoStream, setVideoStream] = useState<MediaStream | undefined>(undefined);
+  const [remoteVideoStream, setRemoteVideoStream] = useState<MediaStream | undefined>(undefined);
 
   const params = useParams();
   const roomId = params.roomId;
 
   useEffect(() => {
-    const s = socketIO.connect("http://localhost:3000");
+    const s = socketIO("http://localhost:3000");
     s.on("connect", () => {
       setSocket(s);
       s.emit("join", {
@@ -35,7 +35,7 @@ export function MeetingPage() {
           video: true,
         })
         .then(async (stream) => {
-          setVideoStream(stream);
+          return setVideoStream(stream);
         });
 
       s.on("localDescription", async ({ description }) => {
@@ -46,7 +46,7 @@ export function MeetingPage() {
           setRemoteVideoStream(new MediaStream([e.track]));
         };
 
-        s.on("iceCandidate", ({ candidate }) => {
+        s.on("iceCandidate", ({ candidate }: { candidate: RTCIceCandidate }) => {
           pc.addIceCandidate(candidate);
         });
 
@@ -97,17 +97,17 @@ export function MeetingPage() {
               onClick={async () => {
                 // sending pc
                 pc.onicecandidate = ({ candidate }) => {
-                  socket.emit("iceCandidate", { candidate });
+                  socket?.emit("iceCandidate", { candidate });
                 };
                 pc.addTrack(videoStream.getVideoTracks()[0]);
                 try {
                   await pc.setLocalDescription(await pc.createOffer());
                   console.log({ aa: pc.localDescription });
-                  socket.emit("localDescription", {
+                  socket?.emit("localDescription", {
                     description: pc.localDescription,
                   });
-                } catch (err) {
-                  console.log({ msg: err?.message });
+                } catch (err: any) {
+                  console.log({ msg: err.message });
                   console.error(err);
                 }
 
@@ -141,7 +141,7 @@ export function MeetingPage() {
         <Video stream={videoStream} />
       </Grid>
       <Grid item xs={12} md={6} lg={4}>
-        <Video stream={remoteVideoStream} />
+        {remoteVideoStream && <Video stream={remoteVideoStream} />}
       </Grid>
     </Grid>
   );

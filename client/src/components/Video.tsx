@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 
-export const Video = ({ stream }) => {
-  const videoRef = useRef();
+interface VideoProps {
+  stream: MediaStream;
+}
+
+export const Video = ({ stream }: VideoProps) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (videoRef && videoRef.current) {
       videoRef.current.srcObject = stream;

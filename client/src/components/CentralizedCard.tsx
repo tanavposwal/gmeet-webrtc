@@ -1,6 +1,11 @@
 import { Card } from "@mui/material";
+import { ReactNode } from "react";
 
-export const CentralizedCard = ({ children }) => {
+interface CentralizedCardProps {
+  children: ReactNode;
+}
+
+export const CentralizedCard = ({ children }: CentralizedCardProps) => {
   return (
     <div
       style={{
