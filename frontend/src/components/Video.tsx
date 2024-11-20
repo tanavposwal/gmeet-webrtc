@@ -14,16 +14,13 @@ export const Video = ({ stream }: VideoProps) => {
 
   return (
     <div>
-      <div>
         <video
-          style={{ borderRadius: 10 }}
           ref={videoRef}
-          muted
+          
           width="100%"
           autoPlay={true}
           playsInline={true}
         />
-      </div>
     </div>
   );
 };

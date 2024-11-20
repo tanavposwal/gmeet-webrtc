@@ -129,7 +129,7 @@ export function MeetingPage() {
       </div>
     );
   }
-  console.log({ remoteVideoStream, videoStream });
+
   return (
     <Grid
       container
