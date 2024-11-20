@@ -6,107 +6,72 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-	cors: {
-		origin: "http://localhost:5173",
-	},
+  cors: {
+    origin: "http://localhost:5173",
+  },
 });
 
 type Room = {
-	[roomId: string]: {
-		roomId: string,
-		users: string[]
-	};
-}
-
-type User = {
-	[userId: string]: {
-		roomId: string
-	};
-}
+  [roomId: string]: {
+    users: string[];
+  };
+};
 
 const rooms: Room = {};
-const users: User = {};
 
 io.on("connection", (socket: Socket) => {
-	console.log("a user connected " + socket.id);
+  console.log("A user connected:", socket.id);
 
-	// user disconnects
-	socket.on("disconnect", () => {
-		Object.keys(rooms).map((roomId) => {
-			rooms[roomId].users = rooms[roomId].users.filter((x) => x !== socket.id);
-		});
-		delete users[socket.id];
-	});
-	
-	// user join a meeting
-	socket.on("join", (params: {roomId: string}) => {
-		const roomId = params.roomId;
-		users[socket.id] = {
-			roomId: roomId,
-		};
-		if (!rooms[roomId]) {
-			rooms[roomId] = {
-				roomId,
-				users: [],
-			};
-		}
-		rooms[roomId].users.push(socket.id);
-		console.log("user added to room " + roomId);
-	});
+  socket.on("disconnect", () => {
+    console.log("A user disconnected:", socket.id);
+    for (const roomId in rooms) {
+      rooms[roomId].users = rooms[roomId].users.filter((id) => id !== socket.id);
+      if (rooms[roomId].users.length === 0) delete rooms[roomId];
+    }
+  });
 
-	socket.on("localDescription", (params: {description: string}) => {
-		let roomId = users[socket.id].roomId;
+  socket.on("join", ({ roomId }: { roomId: string }) => {
+    if (!rooms[roomId]) rooms[roomId] = { users: [] };
+    if (!rooms[roomId].users.includes(socket.id)) {
+      rooms[roomId].users.push(socket.id);
+    }
+    console.log(`${socket.id} joined room ${roomId}`);
+  });
 
-		let otherUsers = rooms[roomId].users;
-		otherUsers.forEach((otherUser) => {
-			if (otherUser !== socket.id) {
-				io.to(otherUser).emit("localDescription", {
-					description: params.description,
-				});
-			}
-		});
-	});
+  socket.on("localDescription", ({ description }: { description: RTCSessionDescriptionInit }) => {
+    const roomId = Object.keys(rooms).find((room) => rooms[room].users.includes(socket.id));
+    if (roomId) {
+      rooms[roomId].users.forEach((userId) => {
+        if (userId !== socket.id) {
+          io.to(userId).emit("localDescription", { description, senderId: socket.id });
+        }
+      });
+    }
+  });
 
-	socket.on("remoteDescription", (params: {description: string}) => {
-		let roomId = users[socket.id].roomId;
-		let otherUsers = rooms[roomId].users;
+  socket.on("remoteDescription", ({ description }: { description: RTCSessionDescriptionInit }) => {
+    const roomId = Object.keys(rooms).find((room) => rooms[room].users.includes(socket.id));
+    if (roomId) {
+      rooms[roomId].users.forEach((userId) => {
+        if (userId !== socket.id) {
+          io.to(userId).emit("remoteDescription", { description, senderId: socket.id });
+        }
+      });
+    }
+  });
 
-		otherUsers.forEach((otherUser) => {
-			if (otherUser !== socket.id) {
-				io.to(otherUser).emit("remoteDescription", {
-					description: params.description,
-				});
-			}
-		});
-	});
-
-	socket.on("iceCandidate", (params: {candidate: string}) => {
-		let roomId = users[socket.id].roomId;
-		let otherUsers = rooms[roomId].users;
-
-		otherUsers.forEach((otherUser) => {
-			if (otherUser !== socket.id) {
-				io.to(otherUser).emit("iceCandidate", {
-					candidate: params.candidate,
-				});
-			}
-		});
-	});
-
-	socket.on("iceCandidateReply", (params: {candidate: string}) => {
-		let roomId = users[socket.id].roomId;
-		let otherUsers = rooms[roomId].users;
-
-		otherUsers.forEach((otherUser) => {
-			if (otherUser !== socket.id) {
-				io.to(otherUser).emit("iceCandidateReply", {
-					candidate: params.candidate,
-				});
-			}
-		});
-	});
+  socket.on("iceCandidate", ({ candidate }: { candidate: RTCIceCandidateInit }) => {
+    const roomId = Object.keys(rooms).find((room) => rooms[room].users.includes(socket.id));
+    if (roomId) {
+      rooms[roomId].users.forEach((userId) => {
+        if (userId !== socket.id) {
+          io.to(userId).emit("iceCandidate", { candidate, senderId: socket.id });
+        }
+      });
+    }
+  });
 });
 
 server.listen(3000, () => {
-	console.log("listening on *:3000");
+  console.log("Server listening on *:3000");
 });
